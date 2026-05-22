@@ -3,6 +3,8 @@ from google.auth.transport.requests import Request
 from google.oauth2.credentials import Credentials
 from google_auth_oauthlib.flow import InstalledAppFlow  
 from googleapiclient.discovery import build
+import base64
+import json
 
 SCOPES = ["https://mail.google.com/"]
 
@@ -21,5 +23,27 @@ if not creds or not creds.valid:
 
 service = build("gmail", "v1", credentials=creds)
 
-results = service.users().labels().list(userId="me").execute()
-print(results)
+results = service.users().messages().list(userId="me", q="category:primary", labelIds=["INBOX"], maxResults=10).execute()
+messages = results.get("messages", [])
+print(messages)
+
+for msg in messages:
+    # Get the full email
+    email = service.users().messages().get(userId='me', id=msg['id'], format='full').execute()
+
+    # get headers (subject, sender,body)
+    if "parts" in email["payload"]:
+        data = email["payload"]["parts"][0]["body"]["data"]
+    else:
+        data = email["payload"]["body"]["data"]
+
+    headers = email["payload"]["headers"]
+    subject = next((h["value"] for h in headers if h["name"] == "Subject"), "No Subject")
+    sender = next((h["value"] for h in headers if h["name"] == "From"), "Unknown")
+    body = base64.urlsafe_b64decode(data).decode("utf-8")
+    
+    print(json.dumps(email["payload"], indent=2))
+    print(f"From: {sender}")
+    print(f"Subject: {subject}")
+    print(f"body: {body}")
+    print("---")
