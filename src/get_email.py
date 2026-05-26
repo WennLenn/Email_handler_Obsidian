@@ -4,7 +4,7 @@ from google.oauth2.credentials import Credentials
 from google_auth_oauthlib.flow import InstalledAppFlow  
 from googleapiclient.discovery import build
 import base64
-import json
+
 
 SCOPES = ["https://mail.google.com/"]
 
@@ -31,19 +31,39 @@ for msg in messages:
     # Get the full email
     email = service.users().messages().get(userId='me', id=msg['id'], format='full').execute()
 
-    # get headers (subject, sender,body)
-    if "parts" in email["payload"]:
-        data = email["payload"]["parts"][0]["body"]["data"]
-    else:
-        data = email["payload"]["body"]["data"]
+    try:
+        # get headers (subject, sender,body)
+        if "parts" in email["payload"]:
+            data = email["payload"]["parts"][0]["body"]["data"]
+        else:
+            data = email["payload"]["body"]["data"]
+    except KeyError:
+        body = "Could not parse body"
 
     headers = email["payload"]["headers"]
     subject = next((h["value"] for h in headers if h["name"] == "Subject"), "No Subject")
     sender = next((h["value"] for h in headers if h["name"] == "From"), "Unknown")
     body = base64.urlsafe_b64decode(data).decode("utf-8")
     
-    print(json.dumps(email["payload"], indent=2))
     print(f"From: {sender}")
     print(f"Subject: {subject}")
     print(f"body: {body}")
     print("---")
+    
+    # File handling
+    try:
+        with open(rf"C:\Users\schaa\OneDrive\Desktop\Obsidian\Git_hub_folder\Email_handler\emails\{subject}.md", "x") as f:
+            f.write(f"Written by: {sender}\n")
+            f.write(f"## Content\n")
+            f.write(body)
+
+        with open(rf"C:\Users\schaa\OneDrive\Desktop\Obsidian\Git_hub_folder\Email_handler\Email_list.md", "r") as f:
+            content = f.read()
+
+        with open(rf"C:\Users\schaa\OneDrive\Desktop\Obsidian\Git_hub_folder\Email_handler\Email_list.md", "w") as f:
+            new_item = f"- [ ] [[{subject}]]\n"
+            content = content.replace("%% kanban:settings", new_item + "%% kanban:settings")
+            f.write(content)
+
+    except FileExistsError:
+        print("file already exists")
